@@ -1919,49 +1919,6 @@ TOKEN makegoto(int label){
     return tok;
 }
 
-/*TOKEN makefor(int sign, TOKEN tok, TOKEN asg, TOKEN tokb, TOKEN endexpr,
-              TOKEN tokc, TOKEN statement)
-{
-    TOKEN label_tok, con_op, do_tok, if_tok;
-
-    tok = makeprogn(tok, asg);
-    label_tok = makelabel();
-    asg->link = label_tok;
-
-    if(sign == 1)
-        con_op = makeop(LEOP);
-    else
-        con_op = makeop(GEOP);
-
-    if_tok = talloc();
-    do_tok = talloc();
-    do_tok = makeprogn(do_tok, statement);
-    if_tok = makeif(if_tok, con_op, do_tok, NULL);
-    label_tok->link = if_tok;
-
-    TOKEN track_tok = copytok(asg->operands);
-    track_tok->link = endexpr;
-    con_op->operands = track_tok;
-    con_op->link = do_tok;
-
-    TOKEN update_assign = makeop(ASSIGNOP);
-    TOKEN increment;
-    if(sign == 1)
-        increment = makeop(PLUSOP);
-    else
-        increment = makeop(MINUSOP);
-    TOKEN update_tok = copytok(asg->operands);
-    increment = binop(increment, update_tok, makeintc(1));
-    update_assign->operands = update_tok;
-    update_tok->link = increment;
-
-    TOKEN goto_tok = makegoto(label_tok->operands->intval);
-    update_assign->link = goto_tok;
-    //statement->link = update_assign;
-
-    return tok;
-}*/
-
 TOKEN makefor(int sign, TOKEN tok, TOKEN asg, TOKEN tokb, TOKEN endexpr,
               TOKEN tokc, TOKEN statement)
 {
@@ -2076,7 +2033,7 @@ void instvars(TOKEN idlist, TOKEN typetok)
     };
 }
 
-void  insttype(TOKEN typename, TOKEN typetok){
+void insttype(TOKEN typename, TOKEN typetok){
     SYMBOL sym, typesym;
     typesym = typetok->symtype;
     sym = searchins(typename->stringval);
@@ -2087,15 +2044,55 @@ void  insttype(TOKEN typename, TOKEN typetok){
 }
 
 TOKEN unaryop(TOKEN op, TOKEN lhs){
-
+   op->operands = lhs;
+    lhs->link = NULL;
+    if(DEBUG){
+        printf("unaryop\n");
+        dbugprinttok(op);
+        dbugprinttok(lhs);
+    }
+    return op;
 }
 
-void  instconst(TOKEN idtok, TOKEN consttok){
-
+void instconst(TOKEN idtok, TOKEN consttok){
+    SYMBOL sym = insertsym(idtok->stringval);
+    sym->kind = CONSTSYM;
+    sym->basicdt = consttok->basicdt;
+    
+    if(sym->basicdt == INTEGER){
+        sym->constval.intnum = consttok->intval;
+    }else if(sym->basicdt == REAL){
+        sym->constval.realnum = consttok->realval;
+    }else if(sym->basicdt == STRINGTYPE){
+        strncpy(sym->constval.stringconst, consttok->stringval, 16);
+    }
+    
+    if (DEBUG) {
+        printf("install const\n");
+    }
 }
 
 TOKEN makerepeat(TOKEN tok, TOKEN statements, TOKEN tokb, TOKEN expr){
+    TOKEN label_tok = makelabel();
+    tok = makeprogn(tok, label_tok);
+    
+    tokb = makeprogn(tokb, statements);
+    label_tok->link = tokb;
+    
+    TOKEN goto_tok = makegoto(label_tok->operands->intval);
+    TOKEN finish_tok = talloc();
+    finish_tok->link = goto_tok;
+    
+    TOKEN if_tok = talloc();
+    if_tok = makeif(if_tok, expr, finish_tok, goto_tok);
+    
+    tokb->link = if_tok;
 
+    if (DEBUG) {
+         printf("make repeat\n");
+         dbugprinttok(tok);
+    }
+    return tok; 
 }
 
 int wordaddress(int n, int wordsize)
