@@ -174,6 +174,7 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON vblock DOT { par
              |  IDENTIFIER
              |  NUMBER
              |  STRING
+             |  NOT factor                     { $$ = unaryop($1, $2); }
              ;
 
 %%
@@ -211,6 +212,30 @@ TOKEN binop(TOKEN op, TOKEN lhs, TOKEN rhs)        /* reduce binary operator */
   { op->operands = lhs;          /* link operands to operator       */
     lhs->link = rhs;             /* link second operand to first    */
     rhs->link = NULL;            /* terminate operand list          */
+    TOKEN op_tok;
+    
+/*======================start of second part=======================*/
+    if (lhs->basicdt == REAL && rhs->basicdt == REAL) {
+        op->basicdt = REAL;
+    }else if(lhs->basicdt == REAL && rhs->basicdt == INTEGER){
+        op->basicdt = REAL;
+        op_tok = makefloat(rhs);
+        lhs->link = op_tok;
+    }else if(lhs->basicdt == INTEGER && rhs->basicdt == REAL){
+        if(op->whichval == ASSIGNOP){
+            op->basicdt = INTEGER;
+            op_tok = makefix(rhs);
+            lhs->link = op_tok;
+        }else{
+            op->basicdt = REAL;
+            op_tok = makefloat(lhs);
+            op_tok->link = rhs;
+        }
+    }else if(lhs->basicdt == INTEGER && rhs->basicdt == INTEGER){
+        op->basicdt = INTEGER;
+    }
+/*======================end of second part=======================*/
+    
     if (DEBUG & DB_BINOP)
        { printf("binop\n");
          dbugprinttok(op);
@@ -283,6 +308,9 @@ TOKEN makeprogn(TOKEN tok, TOKEN statements)
      return tok;
    }
 
+/*===================================================================
+========================start of first part==========================
+===================================================================*/
 TOKEN makeintc(int num){
     TOKEN tok = maketok(NUMBERTOK, INTEGER, NULL);
     tok->intval = num;
@@ -310,6 +338,7 @@ TOKEN makegoto(int label){
     }
     return tok;
 }
+
 
 TOKEN makefor(int sign, TOKEN tok, TOKEN asg, TOKEN tokb, TOKEN endexpr,
               TOKEN tokc, TOKEN statement)
@@ -425,7 +454,7 @@ void instvars(TOKEN idlist, TOKEN typetok)
     };
 }
 
-void insttype(TOKEN typename, TOKEN typetok){
+void  insttype(TOKEN typename, TOKEN typetok){
     SYMBOL sym, typesym;
     typesym = typetok->symtype;
     sym = searchins(typename->stringval);
@@ -434,6 +463,14 @@ void insttype(TOKEN typename, TOKEN typetok){
     sym->datatype = typesym;
     sym->basicdt = typesym->basicdt;
 }
+
+/*===================================================================
+========================end of first part==========================
+===================================================================*/
+
+/*===================================================================
+========================start of second part=========================
+===================================================================*/
 
 TOKEN unaryop(TOKEN op, TOKEN lhs){
    op->operands = lhs;
@@ -479,13 +516,60 @@ TOKEN makerepeat(TOKEN tok, TOKEN statements, TOKEN tokb, TOKEN expr){
     if_tok = makeif(if_tok, expr, finish_tok, goto_tok);
     
     tokb->link = if_tok;
-
     if (DEBUG) {
          printf("make repeat\n");
          dbugprinttok(tok);
     }
     return tok; 
 }
+
+TOKEN makefix(TOKEN tok){
+    TOKEN fix_op;
+    if(tok->tokentype == NUMBERTOK) {
+        tok->basicdt = INTEGER;
+        tok->intval = (int) tok->realval;
+        if (DEBUG) {
+            printf("make fix\n");
+            dbugprinttok(tok);
+            dbugprinttok(fix_op);
+        }
+        return tok;
+    }
+    fix_op = makeop(FIXOP)
+    fix_op->operands = tok;
+    if (DEBUG) {
+         printf("make fix\n");
+         dbugprinttok(tok);
+         dbugprinttok(fix_op);
+    }
+    return fixop;
+}
+
+TOKEN makefloat(TOKEN tok){
+    TOKEN float_op;
+    if(tok->tokentype == NUMBERTOK) {
+        tok->basicdt = REAL;
+        tok->realval = (double) tok->intval;
+        if (DEBUG) {
+            printf("make float\n");
+            dbugprinttok(tok);
+            dbugprinttok(float_op);
+        }
+        return tok;
+    }
+    float_op = makeop(FLOATOP)
+    float_op->operands = tok;
+    if (DEBUG) {
+         printf("make fix\n");
+         dbugprinttok(tok);
+         dbugprinttok(float_op);
+    }
+    return float_op;
+}
+
+/*===================================================================
+========================end of second part===========================
+===================================================================*/
 
 int wordaddress(int n, int wordsize)
   { return ((n + wordsize - 1) / wordsize) * wordsize; }
