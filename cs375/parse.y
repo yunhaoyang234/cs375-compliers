@@ -79,7 +79,7 @@ TOKEN parseresult;
 
 %%
 
-program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON vblock DOT { parseresult = makeprogram($2, $4, $7); } ;
+program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON cblock DOT { parseresult = makeprogram($2, $4, $7); } ;
            ;
   id_list    :  IDENTIFIER COMMA id_list       { $$ = cons($1, $3); }
              |  IDENTIFIER                     { $$ = cons($1, NULL); }
@@ -96,13 +96,13 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON vblock DOT { par
              |  NUMBER
              |  STRING
              ;
-  cdef       :  IDENTIFIER EQ constant         { instconst($1, $3); }
+  vdef       :  id_list COLON type             { instvars($1, $3); }
              ;
-  cdef_list  :  cdef SEMICOLON cdef_list
-             |  cdef SEMICOLON
+  vdef_list  :  vdef SEMICOLON vdef_list
+             |  vdef SEMICOLON
              ;
-  cblock     :  CONST cdef_list tblock         { $$ = $3; }
-             |  tblock
+  vblock     :  VAR vdef_list block            { $$ = $3; }
+             |  block
              ;
   tdef       :  IDENTIFIER EQ type             { insttype($1, $3); }
              ;
@@ -112,12 +112,13 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON vblock DOT { par
   tblock     :  CONST tdef_list vblock         { $$ = $3; }
              |  vblock
              ;
-  vdef       :  id_list COLON type             { instvars($1, $3); }
+  cdef       :  IDENTIFIER EQ constant         { instconst($1, $3); }
              ;
-  vdef_list  :  vdef SEMICOLON
+  cdef_list  :  cdef SEMICOLON cdef_list
+             |  cdef SEMICOLON
              ;
-  vblock     :  VAR vdef_list block            { $$ = $3; }
-             |  block
+  cblock     :  CONST cdef_list tblock         { $$ = $3; }
+             |  tblock
              ;
   type       :  simpletype
              ;
@@ -126,17 +127,24 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON vblock DOT { par
   statement_list :  statement SEMICOLON statement_list { $$ = cons($1, $3); }
              |  statement
              ;
-  statement  :  BEGINBEGIN statement endpart   { $$ = makeprogn($1,cons($2, $3)); }
-             |  IF expr THEN statement endif   { $$ = makeif($1, $2, $4, $5); }
+  statement  :  BEGINBEGIN statement endpart          { $$ = makeprogn($1,cons($2, $3)); }
+             |  IF expression THEN statement endif    { $$ = makeif($1, $2, $4, $5); }
              |  assignment
              |  funcall
-             |  REPEAT statement_list UNTIL expr      { $$ = makerepeat($1, $2, $3, $4); }
-             |  FOR assignment TO expr DO statement   { $$ = makefor(1, $1, $2, $3, $4, $5, $6); }
+             |  REPEAT statement_list UNTIL expression      { $$ = makerepeat($1, $2, $3, $4); }
+             |  FOR assignment TO expression DO statement   { $$ = makefor(1, $1, $2, $3, $4, $5, $6); }
+             ;
+  assignment :  variable ASSIGN expression          { $$ = binop($2, $1, $3); }
              ;
   funcall    :  IDENTIFIER LPAREN expr_list RPAREN  { $$ = makefuncall($2, $1, $3); }
              ;
-  expr_list  :  expr COMMA expr_list           { $$ = cons($1, $3); }
-             |  expr
+  fields     :  id_list COLON type             { instvars($1, $3); }
+             ;
+  field_list :  fields SEMICOLON field_list
+             |  fields
+             ;
+  expr_list  :  expression COMMA expr_list     { $$ = cons($1, $3); }
+             |  expression
              ;
   variable   :  IDENTIFIER                     { $$ = findid($1); }
              |  variable LBRACKET expr_list RBRACKET
@@ -155,12 +163,7 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON vblock DOT { par
   endif      :  ELSE statement                 { $$ = $2; }
              |  /* empty */                    { $$ = NULL; }
              ;
-  assignment :  IDENTIFIER ASSIGN expr         { $$ = binop($2, $1, $3); }
-             ;
-  expr       :  expr PLUS term                 { $$ = binop($2, $1, $3); }
-             |  term
-             ;
-  term       :  term TIMES factor              { $$ = binop($2, $1, $3); }
+  term       :  term times_op factor              { $$ = binop($2, $1, $3); }
              |  factor
              ;
   simple_expression :  sign term               { $$ = unaryop($1, $2); }
@@ -170,10 +173,11 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON vblock DOT { par
   expression :  expression compare_op simple_expression { $$ = binop($2, $1, $3); }
              |  simple_expression
              ;
-  factor     :  LPAREN expr RPAREN             { $$ = $2; }
-             |  IDENTIFIER
-             |  NUMBER
-             |  STRING
+  factor     :  LPAREN expression RPAREN       { $$ = $2; }
+             |  variable
+             |  funcall
+             |  unsigned_constant
+             |  NOT factor                     { $$ = unaryop($1, $2); }
              ;
 
 %%
@@ -211,6 +215,29 @@ TOKEN binop(TOKEN op, TOKEN lhs, TOKEN rhs)        /* reduce binary operator */
   { op->operands = lhs;          /* link operands to operator       */
     lhs->link = rhs;             /* link second operand to first    */
     rhs->link = NULL;            /* terminate operand list          */
+    TOKEN op_tok;
+
+    /*======================start of second part=======================*/
+    if (lhs->basicdt == REAL && rhs->basicdt == REAL) {
+        op->basicdt = REAL;
+    }else if(lhs->basicdt == REAL && rhs->basicdt == INTEGER){
+        op->basicdt = REAL;
+        op_tok = makefloat(rhs);
+        lhs->link = op_tok;
+    }else if(lhs->basicdt == INTEGER && rhs->basicdt == REAL){
+        if(op->whichval == ASSIGNOP){
+            op->basicdt = INTEGER;
+            op_tok = makefix(rhs);
+            lhs->link = op_tok;
+        }else{
+            op->basicdt = REAL;
+            op_tok = makefloat(lhs);
+            op_tok->link = rhs;
+        }
+    }else if(lhs->basicdt == INTEGER && rhs->basicdt == INTEGER){
+        op->basicdt = INTEGER;
+    }
+/*======================end of second part=======================*/
     if (DEBUG & DB_BINOP)
        { printf("binop\n");
          dbugprinttok(op);
@@ -220,14 +247,16 @@ TOKEN binop(TOKEN op, TOKEN lhs, TOKEN rhs)        /* reduce binary operator */
     return op;
   }
 
+/*======================start of first part=======================*/
 TOKEN maketok(int type, int val, TOKEN opd){
     TOKEN tok = talloc();
     tok->tokentype = type;
     tok->whichval = val;
     tok->operands = opd;
     if(DEBUG){
-        printf("maketok");
+        printf("maketok\n");
         dbugprinttok(opd);
+        dbugprinttok(tok);
     }
     return tok;
 }
@@ -253,6 +282,7 @@ TOKEN copytok(TOKEN tok){
 TOKEN makeop(int opnum){
     return maketok(OPERATOR, opnum, NULL);
 }
+/*======================end of first part=======================*/
 
 TOKEN makeif(TOKEN tok, TOKEN exp, TOKEN thenpart, TOKEN elsepart)
   {  tok->tokentype = OPERATOR;  /* Make it look like an operator   */
@@ -283,6 +313,9 @@ TOKEN makeprogn(TOKEN tok, TOKEN statements)
      return tok;
    }
 
+/*===================================================================
+========================start of first part==========================
+===================================================================*/
 TOKEN makeintc(int num){
     TOKEN tok = maketok(NUMBERTOK, INTEGER, NULL);
     tok->intval = num;
@@ -387,6 +420,10 @@ TOKEN findtype(TOKEN tok){
     SYMBOL sym;
     sym = searchst(tok->stringval);
     tok->symtype = sym;
+    if(DEBUG){
+        printf("findtype\n");
+        dbugprinttok(tok);
+    }
     return tok;
 }
 
@@ -408,6 +445,11 @@ void instvars(TOKEN idlist, TOKEN typetok)
 {
     SYMBOL sym, typesym;
     int align;
+    if(DEBUG){
+        printf("instvars\n");
+        dbugprinttok(idlist);
+        dbugprinttok(typetok);
+    }
     typesym = typetok->symtype;
     align = alignsize(typesym);
     while ( idlist != NULL ) /* for each id */
@@ -435,6 +477,14 @@ void insttype(TOKEN typename, TOKEN typetok){
     sym->basicdt = typesym->basicdt;
 }
 
+/*===================================================================
+========================end of first part==========================
+===================================================================*/
+
+/*===================================================================
+========================start of second part=========================
+===================================================================*/
+
 TOKEN unaryop(TOKEN op, TOKEN lhs){
    op->operands = lhs;
     lhs->link = NULL;
@@ -453,10 +503,13 @@ void instconst(TOKEN idtok, TOKEN consttok){
     
     if(sym->basicdt == INTEGER){
         sym->constval.intnum = consttok->intval;
+        sym->size = basicsizes[INTEGER];
     }else if(sym->basicdt == REAL){
         sym->constval.realnum = consttok->realval;
+        sym->size = basicsizes[REAL];
     }else if(sym->basicdt == STRINGTYPE){
         strncpy(sym->constval.stringconst, consttok->stringval, 16);
+        sym->size = basicsizes[STRINGTYPE];
     }
     
     if (DEBUG) {
@@ -486,6 +539,53 @@ TOKEN makerepeat(TOKEN tok, TOKEN statements, TOKEN tokb, TOKEN expr){
     }
     return tok; 
 }
+
+TOKEN makefix(TOKEN tok){
+    TOKEN fix_op;
+    if(tok->tokentype == NUMBERTOK) {
+        tok->basicdt = INTEGER;
+        tok->intval = (int) tok->realval;
+        if (DEBUG) {
+            printf("make fix num tok\n");
+            dbugprinttok(tok);
+            dbugprinttok(fix_op);
+        }
+        return tok;
+    }
+    fix_op = makeop(FIXOP);
+    fix_op->operands = tok;
+    if (DEBUG) {
+         printf("make fix\n");
+         dbugprinttok(tok);
+         dbugprinttok(fix_op);
+    }
+    return fix_op;
+}
+
+TOKEN makefloat(TOKEN tok){
+    TOKEN float_op;
+    if(tok->tokentype == NUMBERTOK) {
+        tok->basicdt = REAL;
+        tok->realval = (double) tok->intval;
+        if (DEBUG) {
+            printf("make float num tok\n");
+            dbugprinttok(tok);
+            dbugprinttok(float_op);
+        }
+        return tok;
+    }
+    float_op = makeop(FLOATOP);
+    float_op->operands = tok;
+    if (DEBUG) {
+         printf("make float\n");
+         dbugprinttok(tok);
+         dbugprinttok(float_op);
+    }
+    return float_op;
+}
+/*===================================================================
+========================end of second part===========================
+===================================================================*/
 
 int wordaddress(int n, int wordsize)
   { return ((n + wordsize - 1) / wordsize) * wordsize; }
