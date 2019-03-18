@@ -173,17 +173,10 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON cblock DOT { par
   expression :  expression compare_op simple_expression { $$ = binop($2, $1, $3); }
              |  simple_expression
              ;
-<<<<<<< HEAD
   factor     :  LPAREN expression RPAREN       { $$ = $2; }
              |  variable
              |  funcall
              |  unsigned_constant
-=======
-  factor     :  LPAREN expr RPAREN             { $$ = $2; }
-             |  IDENTIFIER
-             |  NUMBER
-             |  STRING
->>>>>>> 521f6c6888e68a3c7693e78f2a7ad8670fc93d34
              |  NOT factor                     { $$ = unaryop($1, $2); }
              ;
 
@@ -223,13 +216,8 @@ TOKEN binop(TOKEN op, TOKEN lhs, TOKEN rhs)        /* reduce binary operator */
     lhs->link = rhs;             /* link second operand to first    */
     rhs->link = NULL;            /* terminate operand list          */
     TOKEN op_tok;
-<<<<<<< HEAD
 
     /*======================start of second part=======================*/
-=======
-    
-/*======================start of second part=======================*/
->>>>>>> 521f6c6888e68a3c7693e78f2a7ad8670fc93d34
     if (lhs->basicdt == REAL && rhs->basicdt == REAL) {
         op->basicdt = REAL;
     }else if(lhs->basicdt == REAL && rhs->basicdt == INTEGER){
@@ -250,10 +238,6 @@ TOKEN binop(TOKEN op, TOKEN lhs, TOKEN rhs)        /* reduce binary operator */
         op->basicdt = INTEGER;
     }
 /*======================end of second part=======================*/
-<<<<<<< HEAD
-=======
-    
->>>>>>> 521f6c6888e68a3c7693e78f2a7ad8670fc93d34
     if (DEBUG & DB_BINOP)
        { printf("binop\n");
          dbugprinttok(op);
@@ -359,7 +343,6 @@ TOKEN makegoto(int label){
     }
     return tok;
 }
-
 
 TOKEN makefor(int sign, TOKEN tok, TOKEN asg, TOKEN tokb, TOKEN endexpr,
               TOKEN tokc, TOKEN statement)
@@ -484,7 +467,7 @@ void instvars(TOKEN idlist, TOKEN typetok)
     };
 }
 
-void  insttype(TOKEN typename, TOKEN typetok){
+void insttype(TOKEN typename, TOKEN typetok){
     SYMBOL sym, typesym;
     typesym = typetok->symtype;
     sym = searchins(typename->stringval);
@@ -549,6 +532,7 @@ TOKEN makerepeat(TOKEN tok, TOKEN statements, TOKEN tokb, TOKEN expr){
     if_tok = makeif(if_tok, expr, finish_tok, goto_tok);
     
     tokb->link = if_tok;
+
     if (DEBUG) {
          printf("make repeat\n");
          dbugprinttok(tok);
@@ -562,32 +546,20 @@ TOKEN makefix(TOKEN tok){
         tok->basicdt = INTEGER;
         tok->intval = (int) tok->realval;
         if (DEBUG) {
-<<<<<<< HEAD
             printf("make fix num tok\n");
-=======
-            printf("make fix\n");
->>>>>>> 521f6c6888e68a3c7693e78f2a7ad8670fc93d34
             dbugprinttok(tok);
             dbugprinttok(fix_op);
         }
         return tok;
     }
-<<<<<<< HEAD
     fix_op = makeop(FIXOP);
-=======
-    fix_op = makeop(FIXOP)
->>>>>>> 521f6c6888e68a3c7693e78f2a7ad8670fc93d34
     fix_op->operands = tok;
     if (DEBUG) {
          printf("make fix\n");
          dbugprinttok(tok);
          dbugprinttok(fix_op);
     }
-<<<<<<< HEAD
     return fix_op;
-=======
-    return fixop;
->>>>>>> 521f6c6888e68a3c7693e78f2a7ad8670fc93d34
 }
 
 TOKEN makefloat(TOKEN tok){
@@ -596,36 +568,21 @@ TOKEN makefloat(TOKEN tok){
         tok->basicdt = REAL;
         tok->realval = (double) tok->intval;
         if (DEBUG) {
-<<<<<<< HEAD
             printf("make float num tok\n");
-=======
-            printf("make float\n");
->>>>>>> 521f6c6888e68a3c7693e78f2a7ad8670fc93d34
             dbugprinttok(tok);
             dbugprinttok(float_op);
         }
         return tok;
     }
-<<<<<<< HEAD
     float_op = makeop(FLOATOP);
     float_op->operands = tok;
     if (DEBUG) {
          printf("make float\n");
-=======
-    float_op = makeop(FLOATOP)
-    float_op->operands = tok;
-    if (DEBUG) {
-         printf("make fix\n");
->>>>>>> 521f6c6888e68a3c7693e78f2a7ad8670fc93d34
          dbugprinttok(tok);
          dbugprinttok(float_op);
     }
     return float_op;
 }
-<<<<<<< HEAD
-=======
-
->>>>>>> 521f6c6888e68a3c7693e78f2a7ad8670fc93d34
 /*===================================================================
 ========================end of second part===========================
 ===================================================================*/
