@@ -86,12 +86,17 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON cblock DOT { par
              ;
   block      :  BEGINBEGIN statement endpart   { $$ = makeprogn($1,cons($2, $3)); }
              ;
-  unsigned_constant : IDENTIFIER | NUMBER | NIL | STRING
+  unsigned_constant :
+             |  IDENTIFIER
+             |  NUMBER
+             |  NIL 
+             |  STRING
              ;
-  sign       :  PLUS | MINUS
+  sign       :  PLUS 
+             |  MINUS
              ;
   constant   :  sign IDENTIFIER                { $$ = unaryop($1, $2); }
-             |  IDENTIFIER
+             |  IDENTIFIER                     { $$ = findid($1); }
              |  sign NUMBER                    { $$ = unaryop($1, $2); }
              |  NUMBER
              |  STRING
@@ -109,7 +114,7 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON cblock DOT { par
   tdef_list  :  tdef SEMICOLON tdef_list
              |  tdef SEMICOLON
              ;
-  tblock     :  CONST tdef_list vblock         { $$ = $3; }
+  tblock     :  TYPE tdef_list vblock         { $$ = $3; }
              |  vblock
              ;
   cdef       :  IDENTIFIER EQ constant         { instconst($1, $3); }
@@ -138,11 +143,7 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON cblock DOT { par
              ;
   funcall    :  IDENTIFIER LPAREN expr_list RPAREN  { $$ = makefuncall($2, $1, $3); }
              ;
-  fields     :  id_list COLON type             { instvars($1, $3); }
-             ;
-  field_list :  fields SEMICOLON field_list
-             |  fields
-             ;
+
   expr_list  :  expression COMMA expr_list     { $$ = cons($1, $3); }
              |  expression
              ;
@@ -151,11 +152,23 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON cblock DOT { par
              |  variable DOT IDENTIFIER
              |  variable POINT
              ;
-  plus_op    :  PLUS | MINUS | OR
+  plus_op    :  PLUS 
+             |  MINUS 
+             |  OR
              ;
-  times_op   :  TIMES | DIVIDE | DIV | MOD | AND
+  times_op   :  TIMES 
+             |  DIVIDE 
+             |  DIV 
+             |  MOD 
+             |  AND
              ;
-  compare_op :  EQ | LT | GT | NE | LE | GE | IN
+  compare_op :  EQ 
+             |  LT 
+             |  GT 
+             |  NE 
+             |  LE 
+             |  GE 
+             |  IN
              ;
   endpart    :  SEMICOLON statement endpart    { $$ = cons($2, $3); }
              |  END                            { $$ = NULL; }
@@ -163,7 +176,7 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON cblock DOT { par
   endif      :  ELSE statement                 { $$ = $2; }
              |  /* empty */                    { $$ = NULL; }
              ;
-  term       :  term times_op factor              { $$ = binop($2, $1, $3); }
+  term       :  term times_op factor           { $$ = binop($2, $1, $3); }
              |  factor
              ;
   simple_expression :  sign term               { $$ = unaryop($1, $2); }
@@ -173,10 +186,10 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON cblock DOT { par
   expression :  expression compare_op simple_expression { $$ = binop($2, $1, $3); }
              |  simple_expression
              ;
-  factor     :  LPAREN expression RPAREN       { $$ = $2; }
+  factor     :  unsigned_constant
              |  variable
              |  funcall
-             |  unsigned_constant
+             |  LPAREN expression RPAREN       { $$ = $2; }
              |  NOT factor                     { $$ = unaryop($1, $2); }
              ;
 
@@ -216,7 +229,6 @@ TOKEN binop(TOKEN op, TOKEN lhs, TOKEN rhs)        /* reduce binary operator */
     lhs->link = rhs;             /* link second operand to first    */
     rhs->link = NULL;            /* terminate operand list          */
     TOKEN op_tok;
-
     /*======================start of second part=======================*/
     if (lhs->basicdt == REAL && rhs->basicdt == REAL) {
         op->basicdt = REAL;
@@ -237,7 +249,7 @@ TOKEN binop(TOKEN op, TOKEN lhs, TOKEN rhs)        /* reduce binary operator */
     }else if(lhs->basicdt == INTEGER && rhs->basicdt == INTEGER){
         op->basicdt = INTEGER;
     }
-/*======================end of second part=======================*/
+    /*======================end of second part=======================*/
     if (DEBUG & DB_BINOP)
        { printf("binop\n");
          dbugprinttok(op);
@@ -260,6 +272,7 @@ TOKEN maketok(int type, int val, TOKEN opd){
     }
     return tok;
 }
+
 
 TOKEN copytok(TOKEN tok){
     TOKEN newtok = talloc();
@@ -486,7 +499,7 @@ void insttype(TOKEN typename, TOKEN typetok){
 ===================================================================*/
 
 TOKEN unaryop(TOKEN op, TOKEN lhs){
-   op->operands = lhs;
+    op->operands = lhs;
     lhs->link = NULL;
     if(DEBUG){
         printf("unaryop\n");
@@ -503,17 +516,17 @@ void instconst(TOKEN idtok, TOKEN consttok){
     
     if(sym->basicdt == INTEGER){
         sym->constval.intnum = consttok->intval;
-        sym->size = basicsizes[INTEGER];
+        sym->size = sizeof(int);
     }else if(sym->basicdt == REAL){
         sym->constval.realnum = consttok->realval;
-        sym->size = basicsizes[REAL];
-    }else if(sym->basicdt == STRINGTYPE){
-        strncpy(sym->constval.stringconst, consttok->stringval, 16);
-        sym->size = basicsizes[STRINGTYPE];
-    }
-    
+        sym->size = sizeof(double);
+    }    
+
     if (DEBUG) {
         printf("install const\n");
+	dbugprinttok(idtok);
+	dbugprinttok(consttok);
+	printsymbol(sym);
     }
 }
 
@@ -527,7 +540,7 @@ TOKEN makerepeat(TOKEN tok, TOKEN statements, TOKEN tokb, TOKEN expr){
     TOKEN goto_tok = makegoto(label_tok->operands->intval);
     TOKEN finish_tok = talloc();
     finish_tok->link = goto_tok;
-    
+
     TOKEN if_tok = talloc();
     if_tok = makeif(if_tok, expr, finish_tok, goto_tok);
     
