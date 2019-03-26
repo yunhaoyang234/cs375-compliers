@@ -86,19 +86,13 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON cblock DOT { par
              ;
   block      :  BEGINBEGIN statement endpart   { $$ = makeprogn($1,cons($2, $3)); }
              ;
-  unsigned_constant :
-             |  IDENTIFIER
-             |  NUMBER
-             |  NIL 
-             |  STRING
-             ;
   sign       :  PLUS 
              |  MINUS
              ;
-  constant   :  sign IDENTIFIER                { $$ = unaryop($1, $2); }
-             |  IDENTIFIER                     { $$ = findid($1); }
-             |  sign NUMBER                    { $$ = unaryop($1, $2); }
+  constant   :  IDENTIFIER                     { $$ = findid($1); }
+             |  sign IDENTIFIER                { $$ = unaryop($1, $2); }
              |  NUMBER
+             |  sign NUMBER                    { $$ = unaryop($1, $2); }
              |  STRING
              ;
   vdef       :  id_list COLON type             { instvars($1, $3); }
@@ -186,7 +180,7 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON cblock DOT { par
   expression :  expression compare_op simple_expression { $$ = binop($2, $1, $3); }
              |  simple_expression
              ;
-  factor     :  unsigned_constant
+  factor     :  constant
              |  variable
              |  funcall
              |  LPAREN expression RPAREN       { $$ = $2; }
@@ -404,6 +398,7 @@ TOKEN makefuncall(TOKEN tok, TOKEN fn, TOKEN args)
     tok->whichval = FUNCALLOP;
     tok->operands = fn;
     fn->link = args;
+    tok->basicdt = REAL;
     if(DEBUG){
         printf("makefuncall\n");
         dbugprinttok(fn);
@@ -445,11 +440,33 @@ TOKEN findid(TOKEN tok) {
     SYMBOL sym, typ;
 
     sym = searchst(tok->stringval);
+
+    if(sym->kind == CONSTSYM){
+        tok->tokentype = NUMBERTOK;
+        if(sym->basicdt == INTEGER){
+            tok->basicdt = INTEGER;
+            tok->intval = sym->constval.intnum;
+        }
+        if(sym->basicdt == REAL){
+            tok->basicdt = REAL;
+            tok->realval = sym->constval.realnum;
+        }
+        if(DEBUG){
+            printf("find id\n");
+            dbugprinttok(tok);
+        }
+        return tok;
+    }
     tok->symentry = sym;
     typ = sym->datatype;
     tok->symtype = typ;
+
     if ( typ->kind == BASICTYPE || typ->kind == POINTERSYM)
         tok->basicdt = typ->basicdt;
+    if(DEBUG){
+        printf("findid\n");
+        dbugprinttok(tok);
+    }
     return tok;
 }
 
@@ -538,7 +555,7 @@ TOKEN makerepeat(TOKEN tok, TOKEN statements, TOKEN tokb, TOKEN expr){
     label_tok->link = tokb;
     
     TOKEN goto_tok = makegoto(label_tok->operands->intval);
-    TOKEN finish_tok = talloc();
+    TOKEN finish_tok = maketok(OPERATOR, PROGNOP, NULL);
     finish_tok->link = goto_tok;
 
     TOKEN if_tok = talloc();
