@@ -2119,7 +2119,7 @@ TOKEN makefuncall(TOKEN tok, TOKEN fn, TOKEN args)
     tok->whichval = FUNCALLOP;
     tok->operands = fn;
     fn->link = args;
-    tok->basicdt = REAL;
+    tok->basicdt = args->basicdt;
     if(DEBUG){
         printf("makefuncall\n");
         dbugprinttok(fn);
