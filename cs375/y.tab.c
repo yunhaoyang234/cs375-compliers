@@ -2720,7 +2720,36 @@ TOKEN dogoto(TOKEN tok, TOKEN labeltok){
     return tok;
 }
 
-TOKEN arrayref(TOKEN arr, TOKEN tok, TOKEN subs, TOKEN tokb){
+TOKEN arrayref(TOKEN arr, TOKEN tok, TOKEN subs, TOKEN tokb) {
+    int index = 0;
+    int offset = 0;
+    tok = maketok(OPERATOR, AREFOP, arr);
+    TOKEN offs_tok = NULL;
+    TOKEN trace = subs;
+    SYMBOL arr_sym = arr->symtype;
+
+    while(trace != NULL) {
+        int size = arr_sym->datatype->size;
+
+        TOKEN times_op = makeop(TIMESOP);
+        TOKEN times_tok = binop(times_op, makeintc(size), trace);
+        TOKEN plus_op = makeop(PLUSOP);
+        TOKEN plus_tok = binop(plus_op, makeintc(-size * arr_sym->lowbound), times_tok);
+        if(offs_tok) {
+            TOKEN add_tok = makeop(PLUSOP);
+            TOKEN add_offs = binop(add_tok, offs_tok, plus_tok);
+            offs_tok = add_offs;
+        } else {
+            offs_tok = plus_tok;
+        }
+        arr_sym = arr_sym->datatype;
+        trace = trace->link;
+    }
+    
+    while(arr_sym->kind == TYPESYM)
+        arr_sym = arr_sym->datatype;
+    tok->operands->link = offs_tok;
+    tok->symtype = arr_sym;
     return tok;
 }
 
