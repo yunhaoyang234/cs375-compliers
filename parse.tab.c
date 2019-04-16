@@ -2146,6 +2146,7 @@ TOKEN makeprogn(TOKEN tok, TOKEN statements)
 TOKEN makeintc(int num){
     TOKEN tok = maketok(NUMBERTOK, INTEGER, NULL);
     tok->intval = num;
+    tok->basicdt = INTEGER;
     if (DEBUG) {
         printf("makeintc\n");
         dbugprinttok(tok);
