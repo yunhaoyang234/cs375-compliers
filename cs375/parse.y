@@ -82,7 +82,7 @@ TOKEN parseresult;
 program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON lblock DOT { parseresult = makeprogram($2, $4, $7); } ;
            ;
   id_list    :  IDENTIFIER COMMA id_list       { $$ = cons($1, $3); }
-             |  IDENTIFIER                     { $$ = cons($1, NULL); }
+             |  IDENTIFIER                    
              ;
   block      :  BEGINBEGIN statement endpart   { $$ = makeprogn($1,cons($2, $3)); }
              ;
@@ -159,7 +159,7 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON lblock DOT { par
   expr_list  :  expression COMMA expr_list     { $$ = cons($1, $3); }
              |  expression
              ;
-  fields     :  id_list COLON type             { $$ = instfields($1, NULL); }
+  fields     :  id_list COLON type             { $$ = instfields($1, $3); }
              ;
   field_list :  fields SEMICOLON field_list    { $$ = nconc($1, $3); }
              |  fields
@@ -466,11 +466,17 @@ TOKEN makeprogram(TOKEN name, TOKEN args, TOKEN statements)
 
 TOKEN findtype(TOKEN tok){
     SYMBOL sym;
+    //SYMBOL test;
+    //test = searchst("integer");
+    //printsymbol(test);
+    //printf("\n\n%s\n\n\n", tok->stringval);
+    printst();
     sym = searchst(tok->stringval);
     tok->symtype = sym;
     if(DEBUG){
         printf("findtype\n");
         dbugprinttok(tok);
+        dbugbprinttok(tok);
     }
     return tok;
 }
@@ -676,7 +682,6 @@ void  instlabel (TOKEN num){
 }
 
 TOKEN instfields(TOKEN idlist, TOKEN typetok){
-    printf("begin of inst field");
     SYMBOL sym = typetok->symtype;
     TOKEN tok = idlist;
     while(tok != NULL){
@@ -704,6 +709,7 @@ TOKEN nconc(TOKEN lista, TOKEN listb){
         dbugprinttok(lista);
         dbugprinttok(listb);
     }
+    return tok;
 }
 
 int findlabelindex(int labelnum){
@@ -734,6 +740,7 @@ TOKEN dolabel(TOKEN labeltok, TOKEN tok, TOKEN statement){
 }
 
 TOKEN instenum(TOKEN idlist){
+    printf("begin of instenum");
     int size = 0;
     TOKEN tok = idlist;
     while(tok != NULL){
@@ -820,7 +827,7 @@ TOKEN instarray(TOKEN bounds, TOKEN typetok){
 }
 
 TOKEN instrec(TOKEN rectok, TOKEN argstok){
-    printf("begin of instrec");
+    printf("begin of instrec\n");
     SYMBOL sym = symalloc();
     sym->kind = RECORDSYM;
     rectok->symtype = sym;
@@ -829,11 +836,16 @@ TOKEN instrec(TOKEN rectok, TOKEN argstok){
     int size = 0, offs = 0;
     
     while(args != NULL){
+        dbugprinttok(args);
+        printsymbol(args->symtype);
         size = alignsize(args->symtype);
         sym->datatype = args->symtype;
+        dbugprinttok(args);
         SYMBOL newsym = makesym(args->stringval);
+        dbugprinttok(args);
         newsym->datatype = args->symtype;
         newsym->offset = wordaddress(offs, size);
+        dbugprinttok(args);
         newsym->size = size;
         offs = newsym->offset + size;
         
@@ -844,11 +856,14 @@ TOKEN instrec(TOKEN rectok, TOKEN argstok){
         }
         args_prev = args;
         args = args->link;
+        dbugprinttok(args);
     }
+    args_prev->symtype->link = NULL;
         
     sym->size = wordaddress(offs, 16);
     if (DEBUG) {
         printf("instrec\n");
+        printsymbol(sym);
         dbugprinttok(rectok);
     }
     return rectok;
