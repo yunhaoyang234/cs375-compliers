@@ -109,7 +109,6 @@ SYMBOL searchst(char name[])
   { SYMBOL sym; int level;
     level = blocknumber;
     sym = NULL;
-    printf("%s\n", name);
     while ( sym == NULL && level >= 0 )
           {  sym = searchlev(name, level);
              if (level > 0) level = contblock[level]; /* try containing block */

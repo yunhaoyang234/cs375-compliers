@@ -2261,7 +2261,7 @@ TOKEN findtype(TOKEN tok){
     //test = searchst("integer");
     //printsymbol(test);
     //printf("\n\n%s\n\n\n", tok->stringval);
-    printst();
+    //printst();
     sym = searchst(tok->stringval);
     tok->symtype = sym;
     if(DEBUG){
@@ -2484,6 +2484,7 @@ TOKEN instfields(TOKEN idlist, TOKEN typetok){
         dbugprinttok(tok);
         dbugprinttok(typetok);
         printsymbol(sym);
+        printst();
     }
     return idlist;
 }
@@ -2593,32 +2594,39 @@ TOKEN instpoint(TOKEN tok, TOKEN typename){
     return tok;
 }
 
-TOKEN instarray(TOKEN bounds, TOKEN typetok){
-    SYMBOL arrsym = symalloc(); 
-    SYMBOL rangesym, typesym;
+TOKEN instarray(TOKEN bounds, TOKEN typetok){ 
+    SYMBOL typesym = searchst(typetok->stringval);
     TOKEN tok = bounds;
+    SYMBOL rangesym;
+    TOKEN nexttok = tok->link;
     
     while(tok != NULL){
-        rangesym = tok->symtype;
-        typesym = typetok->symtype;
+        SYMBOL arrsym = symalloc();
         arrsym->kind = ARRAYSYM;
         arrsym->datatype = typesym;
+
+        rangesym = tok->symtype;
         arrsym->lowbound = rangesym->lowbound;
         arrsym->highbound = rangesym->highbound;
         arrsym->size = ((arrsym->highbound)-(arrsym->lowbound)+1)*(typesym->size);
-        typetok->symtype = arrsym;
+        if(!prevsym)
+            typetok->symtype = arrsym;
+        prevsym = arrsym;
         tok = tok->link;
     }
     
     if (DEBUG) {
         printf("instarray\n");
         dbugprinttok(typetok);
+	      printsymbol(arrsym);
     }
+printst();
+exit(0);
     return typetok;
 }
 
 TOKEN instrec(TOKEN rectok, TOKEN argstok){
-    printf("begin of instrec\n");
+    //printf("begin of instrec\n");
     SYMBOL sym = symalloc();
     sym->kind = RECORDSYM;
     rectok->symtype = sym;
@@ -2627,35 +2635,36 @@ TOKEN instrec(TOKEN rectok, TOKEN argstok){
     int size = 0, offs = 0;
     
     while(args != NULL){
-        dbugprinttok(args);
-        printsymbol(args->symtype);
+       // dbugprinttok(args);
+       // printsymbol(args->symtype);
         size = alignsize(args->symtype);
-        sym->datatype = args->symtype;
+
         dbugprinttok(args);
         SYMBOL newsym = makesym(args->stringval);
-        dbugprinttok(args);
+       // dbugprinttok(args);
         newsym->datatype = args->symtype;
         newsym->offset = wordaddress(offs, size);
-        dbugprinttok(args);
+       // dbugprinttok(args);
         newsym->size = size;
         offs = newsym->offset + size;
+        args->symtype = newsym;
         
         if(args_prev){
-            args_prev->symtype->link = args->symtype;
+            args_prev->symtype->link = newsym;
         }else{
-            sym->link = newsym;
+            sym->datatype = newsym;
         }
         args_prev = args;
         args = args->link;
-        dbugprinttok(args);
+        //dbugprinttok(args);
     }
-    args_prev->symtype->link = NULL;
-        
+
     sym->size = wordaddress(offs, 16);
     if (DEBUG) {
         printf("instrec\n");
         printsymbol(sym);
         dbugprinttok(rectok);
+        //printst();
     }
     return rectok;
 }

@@ -2317,11 +2317,6 @@ TOKEN makeprogram(TOKEN name, TOKEN args, TOKEN statements)
 
 TOKEN findtype(TOKEN tok){
     SYMBOL sym;
-    //SYMBOL test;
-    //test = searchst("integer");
-    //printsymbol(test);
-    //printf("\n\n%s\n\n\n", tok->stringval);
-    printst();
     sym = searchst(tok->stringval);
     tok->symtype = sym;
     if(DEBUG){
@@ -2544,6 +2539,7 @@ TOKEN instfields(TOKEN idlist, TOKEN typetok){
         dbugprinttok(tok);
         dbugprinttok(typetok);
         printsymbol(sym);
+        //printst();
     }
     return idlist;
 }
@@ -2653,32 +2649,56 @@ TOKEN instpoint(TOKEN tok, TOKEN typename){
     return tok;
 }
 
-TOKEN instarray(TOKEN bounds, TOKEN typetok){
-    SYMBOL arrsym = symalloc(); 
-    SYMBOL rangesym, typesym;
+TOKEN instarray(TOKEN bounds, TOKEN typetok){ 
+    SYMBOL typesym = searchst(typetok->stringval);
     TOKEN tok = bounds;
-    
+    SYMBOL rangesym;
+    TOKEN nexttok = tok->link;
+    SYMBOL prevsym = NULL;
+
     while(tok != NULL){
-        rangesym = tok->symtype;
-        typesym = typetok->symtype;
+        SYMBOL arrsym = symalloc();
         arrsym->kind = ARRAYSYM;
-        arrsym->datatype = typesym;
-        arrsym->lowbound = rangesym->lowbound;
+	rangesym = tok->symtype;
+
+	arrsym->lowbound = rangesym->lowbound;
         arrsym->highbound = rangesym->highbound;
-        arrsym->size = ((arrsym->highbound)-(arrsym->lowbound)+1)*(typesym->size);
-        typetok->symtype = arrsym;
+
+        if(nexttok == NULL){
+            arrsym->datatype = typesym;
+	    arrsym->size = ((arrsym->highbound)-(arrsym->lowbound)+1)*(typesym->size);
+	}
+	if(prevsym){
+	    prevsym->datatype = arrsym;
+	}else{
+	    typetok->symtype = arrsym;
+	}
+        prevsym = arrsym;
         tok = tok->link;
+	if(nexttok) nexttok = nexttok->link;
     }
     
+    findarraysize(typetok->symtype, typesym);
     if (DEBUG) {
         printf("instarray\n");
         dbugprinttok(typetok);
+	printsymbol(typetok->symtype);
+	//printst();
+        //exit(0);
     }
     return typetok;
 }
 
+int findarraysize(SYMBOL sym, SYMBOL type){
+    if(sym->datatype == type){
+        return sym->size;
+    }
+    sym->size = findarraysize(sym->datatype, type)*((sym->highbound)-(sym->lowbound)+1);
+    return sym->size;
+}
+
 TOKEN instrec(TOKEN rectok, TOKEN argstok){
-    printf("begin of instrec\n");
+    //printf("begin of instrec\n");
     SYMBOL sym = symalloc();
     sym->kind = RECORDSYM;
     rectok->symtype = sym;
@@ -2687,35 +2707,30 @@ TOKEN instrec(TOKEN rectok, TOKEN argstok){
     int size = 0, offs = 0;
     
     while(args != NULL){
-        dbugprinttok(args);
-        printsymbol(args->symtype);
         size = alignsize(args->symtype);
-        sym->datatype = args->symtype;
-        dbugprinttok(args);
         SYMBOL newsym = makesym(args->stringval);
-        dbugprinttok(args);
+
         newsym->datatype = args->symtype;
         newsym->offset = wordaddress(offs, size);
-        dbugprinttok(args);
         newsym->size = size;
         offs = newsym->offset + size;
+        args->symtype = newsym;
         
         if(args_prev){
-            args_prev->symtype->link = args->symtype;
+            args_prev->symtype->link = newsym;
         }else{
-            sym->link = newsym;
+            sym->datatype = newsym;
         }
         args_prev = args;
         args = args->link;
-        dbugprinttok(args);
     }
-    args_prev->symtype->link = NULL;
-        
+
     sym->size = wordaddress(offs, 16);
     if (DEBUG) {
         printf("instrec\n");
         printsymbol(sym);
         dbugprinttok(rectok);
+        //printst();
     }
     return rectok;
 }
@@ -2764,10 +2779,17 @@ TOKEN arrayref(TOKEN arr, TOKEN tok, TOKEN subs, TOKEN tokb) {
 }
 
 TOKEN dopoint(TOKEN var, TOKEN tok){
-    tok->operands = var;
+    tok = maketok(OPERATOR, POINTEROP, var);
+    SYMBOL sym = var->symtype;
+    while(sym->kind == TYPESYM)
+        sym = sym->datatype;
+    tok->symtype = sym;
     if(DEBUG){
         printf("do point\n");
+        //printst();
         dbugprinttok(tok);
+	dbugprinttok(var);
+	dbugbprinttok(var);
     }
     return tok;
 }
@@ -2783,24 +2805,61 @@ TOKEN makearef(TOKEN var, TOKEN off, TOKEN tok){
     return tok;
 }
 
-TOKEN reducedot(TOKEN var, TOKEN dot, TOKEN field){
-    SYMBOL sym = var->symentry;
-    SYMBOL trace = sym->datatype->datatype;
-    int offs = 0;
-    while(trace != NULL) {
-        if (strcmp(trace->namestring, field->stringval) == 0) {
-            offs = trace->offset;
-            var->symentry = trace;
+TOKEN reducedot(TOKEN var, TOKEN dot, TOKEN field) {
+    int pointer = 0;
+
+    SYMBOL recsym = var->symtype;
+    if(recsym->kind == POINTERSYM) {
+        recsym = recsym->datatype;
+        while(recsym->kind == TYPESYM) {
+            recsym = recsym->datatype;
+        }
+        pointer = 1;
+    }
+
+    SYMBOL trace = recsym->datatype;
+    int ofs = 0;
+
+    while(trace) {
+        if(strcmp(trace->namestring, field->stringval)==0){
+            ofs = trace->offset;
             break;
         }
         trace = trace->link;
     }
-    dot = makearef(var, makeintc(offs), dot);
+  
+    if(pointer==0 && var->tokentype==OPERATOR && var->whichval==AREFOP
+            && var->operands->link->tokentype==NUMBERTOK){
+        dot = var;
+        dot->operands->link = makeintc(ofs+var->operands->link->intval);
+        if(DEBUG){
+            printf("reduce dot\n");
+            dbugprinttok(dot);
+            dbugprinttok(var);
+            dbugprinttok(field);
+        }
+	return dot;
+    }else{
+        dot = makearef(var, makeintc(ofs), dot);
+    }
+  
+    dot->basicdt = trace->basicdt;
+
+    trace = trace->datatype;
+    while(trace->kind == TYPESYM) {
+        trace = trace->datatype;
+    }
+    dot->symtype = trace->datatype;
+
     if(DEBUG){
         printf("reduce dot\n");
         dbugprinttok(dot);
+        dbugprinttok(var);
+        dbugprinttok(field);
     }
+    return dot;
 }
+
 
 TOKEN makewhile(TOKEN tok, TOKEN expr, TOKEN tokb, TOKEN statement){
     TOKEN label_tok = makelabel();

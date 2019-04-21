@@ -196,6 +196,8 @@ TOKEN dopoint(TOKEN var, TOKEN tok);
    The symbol table pointer is returned in token typetok. */
 TOKEN instarray(TOKEN bounds, TOKEN typetok);
 
+int findarraysize(SYMBOL sym, SYMBOL type);
+
 int findlabelindex(int labelnum);
 
 /* talloc allocates a new TOKEN record. */
