@@ -94,6 +94,7 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON lblock DOT { par
              |  NUMBER
              |  sign NUMBER                    { $$ = unaryop($1, $2); }
              |  STRING
+	     |  NIL
              ;
   vdef       :  id_list COLON type             { instvars($1, $3); }
              ;
