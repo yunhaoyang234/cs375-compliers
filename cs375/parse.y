@@ -84,7 +84,7 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON lblock DOT { par
   id_list    :  IDENTIFIER COMMA id_list       { $$ = cons($1, $3); }
              |  IDENTIFIER                    
              ;
-  block      :  BEGINBEGIN statement endpart   { $$ = makeprogn($1,cons($2, $3)); }
+  block      :  BEGINBEGIN statement endpart   { $$ = makepnb($1,cons($2, $3)); }
              ;
   sign       :  PLUS 
              |  MINUS
@@ -143,7 +143,7 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON lblock DOT { par
   statement_list :  statement SEMICOLON statement_list { $$ = cons($1, $3); }
              |  statement                      { $$ = cons($1, NULL); }
              ;
-  statement  :  BEGINBEGIN statement endpart          { $$ = makeprogn($1,cons($2, $3)); }
+  statement  :  BEGINBEGIN statement endpart          { $$ = makepnb($1,cons($2, $3)); }
              |  IF expression THEN statement endif    { $$ = makeif($1, $2, $4, $5); }
              |  assignment
              |  funcall
@@ -381,7 +381,7 @@ TOKEN makefor(int sign, TOKEN tok, TOKEN asg, TOKEN tokb, TOKEN endexpr,
 {
     TOKEN label_tok, if_tok, op_tok, trace_tok, trace_tok1, trace_tok2, trace_tok3,
         asg_tok, op_tok2, goto_tok, do_tok;
-    tok = makeprogn(tok, asg);
+    tok = makepnb(tok, asg);
     label_tok = makelabel();
     asg->link = label_tok;
 
@@ -466,7 +466,7 @@ TOKEN makeprogram(TOKEN name, TOKEN args, TOKEN statements)
     TOKEN tok, argtok;
     tok = maketok(OPERATOR, PROGRAMOP, name);
     argtok = talloc();
-    argtok = makeprogn(argtok, args);
+    argtok = makepnb(argtok, args);
     name->link = argtok;
     argtok->link = statements;
     if(DEBUG){
@@ -613,9 +613,9 @@ void instconst(TOKEN idtok, TOKEN consttok){
 
 TOKEN makerepeat(TOKEN tok, TOKEN statements, TOKEN tokb, TOKEN expr){
     TOKEN label_tok = makelabel();
-    tok = makeprogn(tok, label_tok);
+    tok = makepnb(tok, label_tok);
     
-    tokb = makeprogn(tokb, statements);
+    tokb = makepnb(tokb, statements);
     label_tok->link = tokb;
     
     TOKEN goto_tok = makegoto(label_tok->operands->intval);
@@ -1074,7 +1074,7 @@ TOKEN makewhile(TOKEN tok, TOKEN expr, TOKEN tokb, TOKEN statement){
     tok = makepnb(tok, label_tok);
     
     label_tok->link = if_tok;
-    statement->link = goto_tok;
+    statement->operands->link = goto_tok;
     
     if(DEBUG){
         printf("make while\n");
@@ -1084,7 +1084,8 @@ TOKEN makewhile(TOKEN tok, TOKEN expr, TOKEN tokb, TOKEN statement){
 }
 
 TOKEN makepnb(TOKEN tok, TOKEN statements){
-    if(statements->tokentype == OPERATOR && statements->whichval == PROGNOP){
+    if(statements->tokentype == OPERATOR && statements->whichval == PROGNOP
+        && statements->link == NULL){
         return statements;
     }else{
         return makeprogn(tok, statements);
