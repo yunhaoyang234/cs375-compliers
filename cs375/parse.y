@@ -94,7 +94,7 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON lblock DOT { par
              |  NUMBER
              |  sign NUMBER                    { $$ = unaryop($1, $2); }
              |  STRING
-	     |  NIL
+             |  NIL                            { $$ = makeintc(0); }
              ;
   vdef       :  id_list COLON type             { instvars($1, $3); }
              ;
@@ -536,6 +536,10 @@ void instvars(TOKEN idlist, TOKEN typetok)
         dbugprinttok(typetok);
     }
     typesym = typetok->symtype;
+
+    while(typesym && typesym->kind == TYPESYM){
+        typesym = typesym->datatype;
+    }
     align = alignsize(typesym);
     while ( idlist != NULL ) /* for each id */
     {
@@ -548,6 +552,7 @@ void instvars(TOKEN idlist, TOKEN typetok)
             sym->offset + sym->size;
         sym->datatype = typesym;
         sym->basicdt = typesym->basicdt;
+
         idlist = idlist->link;
     };
 }
@@ -927,18 +932,37 @@ TOKEN arrayref(TOKEN arr, TOKEN tok, TOKEN subs, TOKEN tokb) {
         int size = arr_sym->datatype->size;
 
         TOKEN times_op = makeop(TIMESOP);
-        TOKEN times_tok = binop(times_op, makeintc(size), trace);
+        TOKEN times_tok;
+
+        TOKEN next = trace->link;
+
+        if(trace->tokentype == NUMBERTOK)
+            times_tok = makeintc((trace->intval) * size);
+        else
+            times_tok = binop(times_op, makeintc(size), trace);
+
         TOKEN plus_op = makeop(PLUSOP);
-        TOKEN plus_tok = binop(plus_op, makeintc(-size * arr_sym->lowbound), times_tok);
+        TOKEN plus_tok;
+
+        if(times_tok->tokentype == NUMBERTOK){
+            plus_tok = makeintc((-size * arr_sym->lowbound)+(times_tok->intval));
+        }else{
+            plus_tok = binop(plus_op, makeintc(-size * arr_sym->lowbound), times_tok);
+        }
+
         if(offs_tok) {
-            TOKEN add_tok = makeop(PLUSOP);
-            TOKEN add_offs = binop(add_tok, offs_tok, plus_tok);
-            offs_tok = add_offs;
+            if(plus_tok->tokentype == NUMBERTOK){
+                offs_tok->operands->intval += plus_tok->intval;
+            }else{
+                TOKEN add_tok = makeop(PLUSOP);
+                TOKEN add_offs = binop(add_tok, offs_tok, plus_tok);
+                offs_tok = add_offs;
+            }
         } else {
             offs_tok = plus_tok;
         }
         arr_sym = arr_sym->datatype;
-        trace = trace->link;
+        trace = next;
     }
     
     while(arr_sym->kind == TYPESYM)
@@ -965,6 +989,11 @@ TOKEN dopoint(TOKEN var, TOKEN tok){
 }
 
 TOKEN makearef(TOKEN var, TOKEN off, TOKEN tok){
+    if(var->tokentype==OPERATOR && var->whichval==AREFOP){
+        int offset = off->intval;
+        var->operands->link->operands->intval += offset;
+        return var;
+    }
     tok = makeop(AREFOP);
     tok->operands = var;
     var->link = off;
@@ -1042,7 +1071,7 @@ TOKEN makewhile(TOKEN tok, TOKEN expr, TOKEN tokb, TOKEN statement){
     TOKEN if_tok = talloc();
 
     if_tok = makeif(if_tok, expr, statement, NULL);
-    tok = makeprogn(tok, label_tok);
+    tok = makepnb(tok, label_tok);
     
     label_tok->link = if_tok;
     statement->link = goto_tok;
@@ -1052,6 +1081,14 @@ TOKEN makewhile(TOKEN tok, TOKEN expr, TOKEN tokb, TOKEN statement){
         dbugprinttok(tok);
     }
     return tok;
+}
+
+TOKEN makepnb(TOKEN tok, TOKEN statements){
+    if(statements->tokentype == OPERATOR && statements->whichval == PROGNOP){
+        return statements;
+    }else{
+        return makeprogn(tok, statements);
+    }
 }
 
 /*===================================================================
