@@ -2069,7 +2069,7 @@ yyreturn:
    are working.
   */
 
-#define DEBUG        31              /* set bits here for debugging, 0 = off  */
+#define DEBUG        0              /* set bits here for debugging, 0 = off  */
 #define DB_CONS       1             /* bit to trace cons */
 #define DB_BINOP      2             /* bit to trace binop */
 #define DB_MAKEIF     4             /* bit to trace makeif */
@@ -2118,7 +2118,7 @@ TOKEN binop(TOKEN op, TOKEN lhs, TOKEN rhs)        /* reduce binary operator */
         op->basicdt = INTEGER;
     }
     /*======================end of second part=======================*/
-    if (DEBUG & DB_BINOP)
+    //if (DEBUG & DB_BINOP)
        { printf("binop\n");
          dbugprinttok(op);
          dbugprinttok(lhs);
@@ -2276,6 +2276,9 @@ TOKEN makefuncall(TOKEN tok, TOKEN fn, TOKEN args)
         
         tok->operands = args;
         args->link = function;
+        while(typesym->kind == POINTERSYM){
+            typesym = typesym->datatype;
+        }
         fn->link = makeintc(typesym->size);
         if(DEBUG){
             printf("makefuncall new\n");
@@ -2532,6 +2535,7 @@ TOKEN instfields(TOKEN idlist, TOKEN typetok){
     TOKEN tok = idlist;
     while(tok != NULL){
         tok->symtype = sym;
+        tok->basicdt = sym->basicdt;
         tok = tok->link;
     }
     if (DEBUG) {
@@ -2587,7 +2591,6 @@ TOKEN dolabel(TOKEN labeltok, TOKEN tok, TOKEN statement){
 }
 
 TOKEN instenum(TOKEN idlist){
-    printf("begin of instenum");
     int size = 0;
     TOKEN tok = idlist;
     while(tok != NULL){
@@ -2661,6 +2664,10 @@ TOKEN instarray(TOKEN bounds, TOKEN typetok){
         arrsym->kind = ARRAYSYM;
 	rangesym = tok->symtype;
 
+        while(rangesym->kind == TYPESYM){
+            rangesym = rangesym->datatype;
+        }
+
 	arrsym->lowbound = rangesym->lowbound;
         arrsym->highbound = rangesym->highbound;
 
@@ -2690,7 +2697,7 @@ TOKEN instarray(TOKEN bounds, TOKEN typetok){
 }
 
 int findarraysize(SYMBOL sym, SYMBOL type){
-    if(sym->datatype == type){
+    if(sym->datatype == type && sym->datatype->datatype != type){
         return sym->size;
     }
     sym->size = findarraysize(sym->datatype, type)*((sym->highbound)-(sym->lowbound)+1);
@@ -2837,18 +2844,19 @@ TOKEN reducedot(TOKEN var, TOKEN dot, TOKEN field) {
             dbugprinttok(dot);
             dbugprinttok(var);
             dbugprinttok(field);
+            dbugbprinttok(field);
         }
 	return dot;
     }else{
         dot = makearef(var, makeintc(ofs), dot);
     }
-  
-    dot->basicdt = trace->basicdt;
 
     trace = trace->datatype;
     while(trace->kind == TYPESYM) {
         trace = trace->datatype;
     }
+
+    dot->basicdt = trace->basicdt;
     dot->symtype = trace->datatype;
 
     if(DEBUG){
@@ -2866,8 +2874,9 @@ TOKEN makewhile(TOKEN tok, TOKEN expr, TOKEN tokb, TOKEN statement){
     TOKEN goto_tok = makegoto(label_tok->operands->intval);
     TOKEN body_tok = talloc();
     TOKEN if_tok = talloc();
-    body_tok = makeprogn(body_tok, statement);
-    if_tok = makeif(if_tok, expr, body_tok, NULL);
+
+    //body_tok = makeprogn(body_tok, statement);
+    if_tok = makeif(if_tok, expr, statement, NULL);
     tok = makeprogn(tok, label_tok);
     
     label_tok->link = if_tok;
