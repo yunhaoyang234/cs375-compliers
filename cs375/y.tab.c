@@ -2118,7 +2118,7 @@ TOKEN binop(TOKEN op, TOKEN lhs, TOKEN rhs)        /* reduce binary operator */
         op->basicdt = INTEGER;
     }
     /*======================end of second part=======================*/
-    //if (DEBUG & DB_BINOP)
+    if (DEBUG & DB_BINOP)
        { printf("binop\n");
          dbugprinttok(op);
          dbugprinttok(lhs);
@@ -2287,6 +2287,16 @@ TOKEN makefuncall(TOKEN tok, TOKEN fn, TOKEN args)
             dbugprinttok(function);
         }
         return tok;
+    }else if(!strcmp(fn->stringval, "write") || !strcmp(fn->stringval, "writeln")){
+        if(args->basicdt == INTEGER && !strcmp(fn->stringval, "write")){
+            strcpy(fn->stringval, "writei");
+        }else if(args->basicdt == INTEGER && !strcmp(fn->stringval, "writeln")){
+            strcpy(fn->stringval, "writelni");
+        }else if(args->basicdt == REAL && !strcmp(fn->stringval, "write")){
+            strcpy(fn->stringval, "writef");
+        }else if(args->basicdt == REAL && !strcmp(fn->stringval, "writeln")){
+            strcpy(fn->stringval, "writelnf");
+        }
     }
     tok->tokentype = OPERATOR;
     tok->whichval = FUNCALLOP;
@@ -2535,7 +2545,9 @@ TOKEN instfields(TOKEN idlist, TOKEN typetok){
     TOKEN tok = idlist;
     while(tok != NULL){
         tok->symtype = sym;
-        tok->basicdt = sym->basicdt;
+        if(sym->kind != TYPESYM){
+            tok->basicdt = sym->basicdt;
+        }
         tok = tok->link;
     }
     if (DEBUG) {
@@ -2714,12 +2726,12 @@ TOKEN instrec(TOKEN rectok, TOKEN argstok){
     int size = 0, offs = 0;
     
     while(args != NULL){
-        size = alignsize(args->symtype);
+	size = args->symtype->size;
         SYMBOL newsym = makesym(args->stringval);
-
         newsym->datatype = args->symtype;
         newsym->offset = wordaddress(offs, size);
         newsym->size = size;
+
         offs = newsym->offset + size;
         args->symtype = newsym;
         
@@ -2728,6 +2740,7 @@ TOKEN instrec(TOKEN rectok, TOKEN argstok){
         }else{
             sym->datatype = newsym;
         }
+
         args_prev = args;
         args = args->link;
     }
@@ -2824,7 +2837,10 @@ TOKEN reducedot(TOKEN var, TOKEN dot, TOKEN field) {
         pointer = 1;
     }
 
-    SYMBOL trace = recsym->datatype;
+    SYMBOL trace = recsym;
+    if(trace->kind == RECORDSYM){
+        trace = recsym->datatype;
+    }
     int ofs = 0;
 
     while(trace) {
@@ -2839,6 +2855,7 @@ TOKEN reducedot(TOKEN var, TOKEN dot, TOKEN field) {
             && var->operands->link->tokentype==NUMBERTOK){
         dot = var;
         dot->operands->link = makeintc(ofs+var->operands->link->intval);
+        dot->basicdt = trace->datatype->basicdt;
         if(DEBUG){
             printf("reduce dot\n");
             dbugprinttok(dot);
@@ -2872,10 +2889,8 @@ TOKEN reducedot(TOKEN var, TOKEN dot, TOKEN field) {
 TOKEN makewhile(TOKEN tok, TOKEN expr, TOKEN tokb, TOKEN statement){
     TOKEN label_tok = makelabel();
     TOKEN goto_tok = makegoto(label_tok->operands->intval);
-    TOKEN body_tok = talloc();
     TOKEN if_tok = talloc();
 
-    //body_tok = makeprogn(body_tok, statement);
     if_tok = makeif(if_tok, expr, statement, NULL);
     tok = makeprogn(tok, label_tok);
     
