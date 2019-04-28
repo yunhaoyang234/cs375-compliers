@@ -14,7 +14,7 @@ int genarith(TOKEN code);
 void genc(TOKEN code);
 
 
-
+void set_op_reg();
 
 /* You may use the function headers below if you wish,
    or you may replace them if you wish.  */
