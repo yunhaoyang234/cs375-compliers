@@ -178,11 +178,26 @@ int genaref(TOKEN code, int storereg){
 int genfun(TOKEN code){
     TOKEN functok = code->operands;
     TOKEN args = functok->link;
-    while(args != NULL){
-        genarith(args);
-        args = args->link;
+    int reg;
+    if(args != NULL){
+        reg = genarith(args);
     }
+    SYMBOL sym = searchst(functok->stringval);
+    switch(args && args->basicdt){
+        case INTEGER:
+            if(reg != EDI) asmrr(MOVL, reg, EDI);
+            break;
+        case REAL:
+            if(reg != EDI) asmrr(MOVSD, reg, EDI);
+            break;
+    }
+
     asmcall(functok->stringval);
+    switch(sym->datatype->basicdt){
+        case INTEGER: return EAX;
+        case REAL: return XMM0;    
+    }
+    
     return RAX;
 }
 
@@ -200,8 +215,7 @@ int funcallin(TOKEN code){
 /* Trivial version */
 /* Generate code for arithmetic expression, return a register number */
 int genarith(TOKEN code){
-    int num, reg, reg2, ofs;
-    reg = -1;
+    int num, reg, reg2, ofs = -1;
     TOKEN lhs, rhs;
     SYMBOL idsym;
     double d;
@@ -338,8 +352,10 @@ void genc(TOKEN code)
                  break;
               case REAL:
                  asmst(MOVSD, reg, offs, lhs->stringval);
+                 break;
               case POINTER:
                  asmst(MOVQ, reg, offs, lhs->stringval);
+                 break;
              };
            break;
 	 case FUNCALLOP:
