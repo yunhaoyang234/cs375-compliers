@@ -2270,7 +2270,11 @@ TOKEN makefor(int sign, TOKEN tok, TOKEN asg, TOKEN tokb, TOKEN endexpr,
     op_tok2 = binop(op_tok2, trace_tok3, makeintc(1));
     asg_tok = binop(asg_tok, trace_tok2, op_tok2);
 
-    TOKEN statement_tok = statement->operands;
+    TOKEN statement_tok = statement;
+
+    if(statement->whichval == PROGNOP)
+        statement_tok = statement->operands;
+
     while(statement_tok->link != NULL){
         statement_tok = statement_tok->link;
     }
