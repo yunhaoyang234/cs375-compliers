@@ -52,6 +52,7 @@
 #include "symtab.h"
 #include "parse.h"
 #include "pprint.h"
+#include "codegen.h"
 
         /* define the type of the Yacc stack element to be TOKEN */
 
@@ -94,7 +95,9 @@ program    : PROGRAM IDENTIFIER LPAREN id_list RPAREN SEMICOLON lblock DOT { par
              |  NUMBER
              |  sign NUMBER                    { $$ = unaryop($1, $2); }
              |  STRING
-             |  NIL                            { $$ = makeintc(0); }
+             |  NIL                            { TOKEN tok = makeintc(0);
+                                                 tok->basicdt = POINTER;
+                                                 $$ = tok; }
              ;
   vdef       :  id_list COLON type             { instvars($1, $3); }
              ;
@@ -969,6 +972,8 @@ TOKEN arrayref(TOKEN arr, TOKEN tok, TOKEN subs, TOKEN tokb) {
         arr_sym = arr_sym->datatype;
     tok->operands->link = offs_tok;
     tok->symtype = arr_sym;
+    tok->basicdt = 0;
+
     return tok;
 }
 
@@ -1074,7 +1079,10 @@ TOKEN makewhile(TOKEN tok, TOKEN expr, TOKEN tokb, TOKEN statement){
     tok = makepnb(tok, label_tok);
     
     label_tok->link = if_tok;
-    statement->operands->link = goto_tok;
+    TOKEN statement_tok = statement->operands;
+    while(statement_tok->link != NULL)
+        statement_tok = statement_tok->link;
+    statement_tok->link = goto_tok;
     
     if(DEBUG){
         printf("make while\n");
@@ -1113,7 +1121,7 @@ int main(void)          /*  */
     if (DEBUG & DB_PARSERES) dbugprinttok(parseresult);
     ppexpr(parseresult);           /* Pretty-print the result tree */
     /* uncomment following to call code generator. */
-     /*
+     
     gencode(parseresult, blockoffs[blocknumber], labelnumber);
- */
+ 
   }

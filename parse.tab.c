@@ -1472,7 +1472,7 @@ yyreduce:
 
   case 5:
 #line 87 "cs375/parse.y" /* yacc.c:1646  */
-    { (yyval) = makeprogn((yyvsp[-2]),cons((yyvsp[-1]), (yyvsp[0]))); }
+    { (yyval) = makepnb((yyvsp[-2]),cons((yyvsp[-1]), (yyvsp[0]))); }
 #line 1477 "parse.tab.c" /* yacc.c:1646  */
     break;
 
@@ -1628,7 +1628,7 @@ yyreduce:
 
   case 45:
 #line 146 "cs375/parse.y" /* yacc.c:1646  */
-    { (yyval) = makeprogn((yyvsp[-2]),cons((yyvsp[-1]), (yyvsp[0]))); }
+    { (yyval) = makepnb((yyvsp[-2]),cons((yyvsp[-1]), (yyvsp[0]))); }
 #line 1633 "parse.tab.c" /* yacc.c:1646  */
     break;
 
@@ -2177,7 +2177,7 @@ TOKEN makefor(int sign, TOKEN tok, TOKEN asg, TOKEN tokb, TOKEN endexpr,
 {
     TOKEN label_tok, if_tok, op_tok, trace_tok, trace_tok1, trace_tok2, trace_tok3,
         asg_tok, op_tok2, goto_tok, do_tok;
-    tok = makeprogn(tok, asg);
+    tok = makepnb(tok, asg);
     label_tok = makelabel();
     asg->link = label_tok;
 
@@ -2262,7 +2262,7 @@ TOKEN makeprogram(TOKEN name, TOKEN args, TOKEN statements)
     TOKEN tok, argtok;
     tok = maketok(OPERATOR, PROGRAMOP, name);
     argtok = talloc();
-    argtok = makeprogn(argtok, args);
+    argtok = makepnb(argtok, args);
     name->link = argtok;
     argtok->link = statements;
     if(DEBUG){
@@ -2332,6 +2332,10 @@ void instvars(TOKEN idlist, TOKEN typetok)
         dbugprinttok(typetok);
     }
     typesym = typetok->symtype;
+
+    while(typesym && typesym->kind == TYPESYM){
+        typesym = typesym->datatype;
+    }
     align = alignsize(typesym);
     while ( idlist != NULL ) /* for each id */
     {
@@ -2344,6 +2348,7 @@ void instvars(TOKEN idlist, TOKEN typetok)
             sym->offset + sym->size;
         sym->datatype = typesym;
         sym->basicdt = typesym->basicdt;
+
         idlist = idlist->link;
     };
 }
@@ -2404,9 +2409,9 @@ void instconst(TOKEN idtok, TOKEN consttok){
 
 TOKEN makerepeat(TOKEN tok, TOKEN statements, TOKEN tokb, TOKEN expr){
     TOKEN label_tok = makelabel();
-    tok = makeprogn(tok, label_tok);
+    tok = makepnb(tok, label_tok);
     
-    tokb = makeprogn(tokb, statements);
+    tokb = makepnb(tokb, statements);
     label_tok->link = tokb;
     
     TOKEN goto_tok = makegoto(label_tok->operands->intval);
@@ -2723,18 +2728,37 @@ TOKEN arrayref(TOKEN arr, TOKEN tok, TOKEN subs, TOKEN tokb) {
         int size = arr_sym->datatype->size;
 
         TOKEN times_op = makeop(TIMESOP);
-        TOKEN times_tok = binop(times_op, makeintc(size), trace);
+        TOKEN times_tok;
+
+        TOKEN next = trace->link;
+
+        if(trace->tokentype == NUMBERTOK)
+            times_tok = makeintc((trace->intval) * size);
+        else
+            times_tok = binop(times_op, makeintc(size), trace);
+
         TOKEN plus_op = makeop(PLUSOP);
-        TOKEN plus_tok = binop(plus_op, makeintc(-size * arr_sym->lowbound), times_tok);
+        TOKEN plus_tok;
+
+        if(times_tok->tokentype == NUMBERTOK){
+            plus_tok = makeintc((-size * arr_sym->lowbound)+(times_tok->intval));
+        }else{
+            plus_tok = binop(plus_op, makeintc(-size * arr_sym->lowbound), times_tok);
+        }
+
         if(offs_tok) {
-            TOKEN add_tok = makeop(PLUSOP);
-            TOKEN add_offs = binop(add_tok, offs_tok, plus_tok);
-            offs_tok = add_offs;
+            if(plus_tok->tokentype == NUMBERTOK){
+                offs_tok->operands->intval += plus_tok->intval;
+            }else{
+                TOKEN add_tok = makeop(PLUSOP);
+                TOKEN add_offs = binop(add_tok, offs_tok, plus_tok);
+                offs_tok = add_offs;
+            }
         } else {
             offs_tok = plus_tok;
         }
         arr_sym = arr_sym->datatype;
-        trace = trace->link;
+        trace = next;
     }
     
     while(arr_sym->kind == TYPESYM)
@@ -2761,6 +2785,11 @@ TOKEN dopoint(TOKEN var, TOKEN tok){
 }
 
 TOKEN makearef(TOKEN var, TOKEN off, TOKEN tok){
+    if(var->tokentype==OPERATOR && var->whichval==AREFOP){
+        int offset = off->intval;
+        var->operands->link->operands->intval += offset;
+        return var;
+    }
     tok = makeop(AREFOP);
     tok->operands = var;
     var->link = off;
@@ -2838,16 +2867,25 @@ TOKEN makewhile(TOKEN tok, TOKEN expr, TOKEN tokb, TOKEN statement){
     TOKEN if_tok = talloc();
 
     if_tok = makeif(if_tok, expr, statement, NULL);
-    tok = makeprogn(tok, label_tok);
+    tok = makepnb(tok, label_tok);
     
     label_tok->link = if_tok;
-    statement->link = goto_tok;
+    statement->operands->link = goto_tok;
     
     if(DEBUG){
         printf("make while\n");
         dbugprinttok(tok);
     }
     return tok;
+}
+
+TOKEN makepnb(TOKEN tok, TOKEN statements){
+    if(statements->tokentype == OPERATOR && statements->whichval == PROGNOP
+        && statements->link == NULL){
+        return statements;
+    }else{
+        return makeprogn(tok, statements);
+    }
 }
 
 /*===================================================================
@@ -2871,7 +2909,7 @@ int main(void)          /*  */
     if (DEBUG & DB_PARSERES) dbugprinttok(parseresult);
     ppexpr(parseresult);           /* Pretty-print the result tree */
     /* uncomment following to call code generator. */
-     /*
+     
     gencode(parseresult, blockoffs[blocknumber], labelnumber);
- */
+ 
   }
