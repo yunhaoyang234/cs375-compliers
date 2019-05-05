@@ -249,6 +249,7 @@ TOKEN binop(TOKEN op, TOKEN lhs, TOKEN rhs)        /* reduce binary operator */
   { op->operands = lhs;          /* link operands to operator       */
     lhs->link = rhs;             /* link second operand to first    */
     rhs->link = NULL;            /* terminate operand list          */
+    op->basicdt = lhs->basicdt == 9999 ? rhs->basicdt : lhs->basicdt;
     TOKEN op_tok;
     /*======================start of second part=======================*/
     if (lhs->basicdt == REAL && rhs->basicdt == REAL) {
@@ -397,7 +398,7 @@ TOKEN makefor(int sign, TOKEN tok, TOKEN asg, TOKEN tokb, TOKEN endexpr,
     op_tok->operands = trace_tok1;
 
     do_tok = talloc();
-    do_tok = makeprogn(do_tok, statement);
+    do_tok = makepnb(do_tok, statement);
 
     if_tok = talloc();
     if_tok = makeif(if_tok, op_tok, do_tok, NULL);
@@ -412,7 +413,12 @@ TOKEN makefor(int sign, TOKEN tok, TOKEN asg, TOKEN tokb, TOKEN endexpr,
         op_tok2 = makeop(MINUSOP);
     op_tok2 = binop(op_tok2, trace_tok3, makeintc(1));
     asg_tok = binop(asg_tok, trace_tok2, op_tok2);
-    statement->link = asg_tok;
+
+    TOKEN statement_tok = statement->operands;
+    while(statement_tok->link != NULL){
+        statement_tok = statement_tok->link;
+    }
+    statement_tok->link = asg_tok;
 
     goto_tok = makegoto(label_tok->operands->intval);
     asg_tok->link = goto_tok;
@@ -456,6 +462,7 @@ TOKEN makefuncall(TOKEN tok, TOKEN fn, TOKEN args)
     tok->operands = fn;
     fn->link = args;
     tok->basicdt = args->basicdt;
+    
     if(DEBUG){
         printf("makefuncall\n");
         dbugprinttok(fn);
@@ -555,7 +562,7 @@ void instvars(TOKEN idlist, TOKEN typetok)
             sym->offset + sym->size;
         sym->datatype = typesym;
         sym->basicdt = typesym->basicdt;
-
+        //idlist->basicdt = typesym->basicdt;
         idlist = idlist->link;
     };
 }
@@ -584,6 +591,7 @@ void insttype(TOKEN typename, TOKEN typetok){
 
 TOKEN unaryop(TOKEN op, TOKEN lhs){
     op->operands = lhs;
+    op->basicdt = lhs->basicdt;
     lhs->link = NULL;
     if(DEBUG){
         printf("unaryop\n");

@@ -68,7 +68,7 @@ void set_op_reg(){
             op_reg[i][j] = -1;
         
     op_reg[INTEGER][PLUSOP] = ADDL;
-    op_reg[INTEGER][MINUS] = SUBL;
+    op_reg[INTEGER][MINUSOP] = SUBL;
     op_reg[INTEGER][TIMESOP] = IMULL;
     op_reg[INTEGER][DIVIDEOP] = DIVL;
     op_reg[INTEGER][EQOP] = CMPL;
@@ -82,7 +82,7 @@ void set_op_reg(){
     op_reg[INTEGER][NOTOP] = NEGL;
     
     op_reg[REAL][PLUSOP] = ADDSD;
-    op_reg[REAL][MINUS] = SUBSD;
+    op_reg[REAL][MINUSOP] = SUBSD;
     op_reg[REAL][TIMESOP] = MULSD;
     op_reg[REAL][DIVIDEOP] = DIVSD;
     op_reg[REAL][EQOP] = CMPSD;
@@ -94,7 +94,7 @@ void set_op_reg(){
     op_reg[REAL][NOTOP] = NEGSD;
     
     op_reg[2][PLUSOP] = ADDQ;
-    op_reg[2][MINUS] = SUBQ;
+    op_reg[2][MINUSOP] = SUBQ;
     op_reg[2][TIMESOP] = IMULQ;
     op_reg[2][EQOP] = CMPQ;
     op_reg[2][LEOP] = CMPQ;
@@ -124,7 +124,7 @@ void clearreg(){
 /* Mark a register unused */
 void unused(int reg){
     if(reg < 0 || reg > 31){
-        printf("invalid reg number");
+        //printf("invalid reg number");
         return;
     }
     reg_table[reg] = 0;
@@ -243,7 +243,7 @@ int genfun(TOKEN code){
     if(args != NULL){
         reg = genarith(args);
     }
-    //printf("%d  %s  \n", reg, functok->stringval);
+    //printf("genfunc  %d  %s  \n", reg, functok->stringval);
     //dbugprinttok(args);
     SYMBOL sym = searchst(functok->stringval);
     //printsymbol(sym);
@@ -280,10 +280,12 @@ int genfun(TOKEN code){
     }
     unused(reg);
     asmcall(functok->stringval);
+    //printf("end of genfun");
     return RAX;
 }
 
 int funcallin(TOKEN code){
+    //printf("funcallin");
     if(code->tokentype == OPERATOR && code->whichval == FUNCALLOP){
         return 1;
     }
@@ -307,7 +309,8 @@ int genarith(TOKEN code){
     }
     switch ( code->tokentype ){ 
         case NUMBERTOK:
-        
+            //printf("number\n");
+            //dbugprinttok(code);
             switch (code->basicdt){
                 case INTEGER:
                     num = code->intval;
@@ -340,8 +343,9 @@ int genarith(TOKEN code){
         case IDENTIFIERTOK:
             idsym = searchst(code->stringval);
             ofs = idsym->offset - stkframesize;
-            
-            switch (code->basicdt) { 
+            //printf("id\n");
+            //printsymbol(idsym);
+            switch (idsym->basicdt) { 
                 case INTEGER:
                     reg = getreg(0);
                     asmld(MOVL, ofs, reg, idsym->namestring);
@@ -360,6 +364,7 @@ int genarith(TOKEN code){
         case OPERATOR:
             lhs = code->operands;
             rhs = lhs->link;
+            //dbugprinttok(code);
             if(code->whichval == FUNCALLOP){
                 reg = genfun(code);
             }
@@ -385,20 +390,21 @@ int genarith(TOKEN code){
             }
             else if(code->basicdt == INTEGER || code->basicdt == REAL || 
                     code->basicdt == POINTER){
+                //dbugprinttok(code);
                 int dt = code->basicdt;
                 if(dt==POINTER) dt = 2;
                 int op = code->whichval;
                 reg = genarith(lhs);
                 if(rhs == NULL){
                     reg2 = getreg(dt);
+                    //printf("%d   %d  %d\n", reg_table[XMM0],dt, reg2);
                     asmfneg(reg, reg2);
-                    reg = reg2;
                     unused(reg2);
                 }else if(funcallin(rhs)){
                     asmsttemp(reg);
                     unused(reg);
                     reg2 = genarith(rhs);
-                    used(reg);
+                    reg = getreg(dt);
                     asmldtemp(reg);
                     asmrr(op_reg[dt][op], reg2, reg);
                     unused(reg2);
@@ -409,7 +415,6 @@ int genarith(TOKEN code){
                 }
             }
      };
-
     return reg;
 }
 
@@ -449,7 +454,8 @@ void genc(TOKEN code)
             //printf("assign   %d\n", lhs->basicdt);
             sym = lhs->symentry;              /* assumes lhs is a simple var  */
 	        offs = sym->offset - stkframesize; /* net offset of the var   */
-           switch (lhs->basicdt)            /* store value into lhs  */
+                
+           switch (sym->basicdt)            /* store value into lhs  */
              { case INTEGER:
                  asmst(MOVL, reg, offs, lhs->stringval);
                  break;
@@ -481,10 +487,14 @@ void genc(TOKEN code)
         int dt = lhs->basicdt;
         int reg2;
 
+        if(dt == 9999){
+            SYMBOL typesym = searchst(lhs->stringval);
+            dt = typesym->basicdt;
+        }
         if(dt == POINTER)
             dt = 2;
-        //printf("\n\nifop   %d\n", tok->whichval);
-        //dbugprinttok(tok->link);
+        //printf("\n\nifop   %d   %d\n", tok->whichval, dt);
+        //dbugprinttok(tok);
         //dbugprinttok(lhs);
         //dbugprinttok(rhs);
 
@@ -510,4 +520,5 @@ void genc(TOKEN code)
         asmlabel(label2);
 	   break;
 	 };
+     //printf("end of genc\n\n\n");
   }
