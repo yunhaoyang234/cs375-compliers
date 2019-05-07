@@ -265,6 +265,7 @@ int genfun(TOKEN code){
         case INTEGER:
             asmcall(functok->stringval);
             unused(reg);
+            if(!strcmp(functok->stringval, "iround")) used(EAX);
             return EAX;
         case REAL:
             if(reg != XMM0) {

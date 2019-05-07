@@ -5,5 +5,5 @@ const d = 0.0625; {1/16, 16 lines for interval [x,x+1]}
    c = 6.28318; {2*pi}  lim = 32;
 var x,y : real;  i,n : integer;
 begin
-   n := round(s*y) + h
+   n := iround(s*y) + h
 end.

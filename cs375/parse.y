@@ -466,6 +466,9 @@ TOKEN makefuncall(TOKEN tok, TOKEN fn, TOKEN args)
     tok->operands = fn;
     fn->link = args;
     tok->basicdt = args->basicdt;
+
+    if(!strcmp(fn->stringval, "iround"))
+        tok->basicdt = INTEGER;
     
     if(DEBUG){
         printf("makefuncall\n");

@@ -2,10 +2,9 @@
 	movsd	.LC1(%rip),%xmm0   	#  32.000000 -> %xmm0
 	movsd	-40(%rbp),%xmm1     	#  y -> %xmm1
 	mulsd	%xmm1,%xmm0         	#  %xmm0 * %xmm1 -> %xmm0
-	call	round              	#  round()
-	movsd	.LC2(%rip),%xmm1   	#  34.000000 -> %xmm1
-	addsd	%xmm1,%xmm0         	#  %xmm0 + %xmm1 -> %xmm0
-	cvttsd2si	%xmm0,%eax    	#  fix %xmm0 -> %eax
+	call	iround              	#  iround()
+	movl	$34,%ecx         	#  34 -> %ecx
+	addl	%ecx,%eax         	#  %eax + %ecx -> %eax
 	movl	%eax,-28(%rbp)     	#  %eax -> n
 # ----------------------- begin Epilogue code ---------------------------
 	movq	%r9, %rbx        # restore %rbx (callee-saved) from %r9
@@ -20,9 +19,5 @@
 .LC1:
 	.long	0   	#  32.000000
 	.long	1077936128
-	.align  8
-.LC2:
-	.long	0   	#  34.000000
-	.long	1078001664
 
         .ident  "CS 375 Compiler - Spring 2018"
